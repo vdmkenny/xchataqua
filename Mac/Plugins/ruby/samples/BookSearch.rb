@@ -39,6 +39,7 @@ class BookSearch < XChatRubyPlugin
   def initialize
     @entries = []
     @context = nil
+    @waiting_for_listing = false
 
     hook_command("bsearch", XCHAT_PRI_NORM, method(:cmd_search),
                  "Usage: /bsearch <terms>, ask the channel's search bots about a subject")
@@ -65,6 +66,7 @@ class BookSearch < XChatRubyPlugin
     # Results come back later and out of band, so remember where to report.
     @context = get_context
     @entries = []
+    @waiting_for_listing = true
 
     command("say @search #{terms}")
     puts_fmt "![c(blue)]BookSearch![c] asked for #{terms}. The listing arrives as a download."
@@ -122,7 +124,11 @@ class BookSearch < XChatRubyPlugin
   # it names the file exactly wherever it was saved to.
   def on_download(words, data)
     name = words[0].to_s
-    return XCHAT_EAT_NONE unless name =~ LISTING
+    return XCHAT_EAT_NONE unless @waiting_for_listing && name =~ LISTING
+
+    # Only the next matching listing belongs to /bsearch. Direct searches
+    # must remain in Downloads even after a previous plugin search.
+    @waiting_for_listing = false
 
     path = path_from_url(words[1].to_s)
     return XCHAT_EAT_NONE if path.nil? || !File.exist?(path)
